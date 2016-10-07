@@ -12,53 +12,66 @@ station_rand = True
 station_base = 30
 station_delta = 90
 
+station_incr = 0
+
 FULL_DATA = True
 
 simulator_filename = "_simulated_data.json"
-simulator_extended_filename = "_extended_data.json"
+# simulator_extended_filename = "_extended_data.json"
+
+simulator_trains_filename = "_simulated_trains_gps.json"
+simulator_users_filename = "simulated_users_gps.json"
 
 
-def save_data_to_file(env, line, delta_t=30, full_data=FULL_DATA):
+def save_data_to_file(env, delta_t=30, full_data=FULL_DATA):
     yield env.timeout(delta_t)
     waiting_time_array = []
     waiting_time_simplified = []
-    sd.gps_trains_position[line] = []
+
+    for line in sd.lines:
+        sd.gps_trains_position[line] = []
     sd.gps_users_position = []
 
     while sd.arrived_vehicles[line] < sd.num_vehicles:
-        if full_data:
-            waiting_time = print_waiting_times(env, line)
-        else:
-            waiting_time = print_arrival_at_station(env, line)
 
-        waiting_time_array.append({
-            "stations": waiting_time,
-            "id": "sim_line_"+line})
-        waiting_time_simplified.append(waiting_time)
-
-        sd.gps_trains_position[line].append(relPosToGps(line))
         sd.gps_users_position.append([usr[:] for usr in sd.users_pos_array])
 
-        save_file(line + simulator_filename, waiting_time_array, waiting_time_simplified)
-        save_file(line + simulator_extended_filename, sd.gps_trains_position[line], sd.gps_users_position)
+        with open(simulator_users_filename, "w") as f:
+            f.write(json.dumps({"users": sd.gps_users_position}))
 
         if station_rand:
             sd.station_stop = randint(station_base, station_base + station_delta)
         else:
             sd.station_stop += station_incr
 
+        for line in sd.lines:
+            if full_data:
+                waiting_time = print_waiting_times(env, line)
+            else:
+                waiting_time = print_arrival_at_station(env, line)
+
+            waiting_time_array.append({
+                "stations": waiting_time,
+                "id": "sim_line_" + line})
+            waiting_time_simplified.append(waiting_time)
+            save_wt_file(line + simulator_filename, waiting_time_array, waiting_time_simplified)
+
+            sd.gps_trains_position[line].append(relPosToGps(line))
+
+            with open(line + simulator_trains_filename, "w") as f:
+                f.write(json.dumps({"trains": sd.gps_trains_position[line], "line": line}))
 
         yield env.timeout(delta_t)
 
 
-#vehicle_in_station = [0 for _ in range(sd.n_stations)]
+# vehicle_in_station = [0 for _ in range(sd.n_stations)]
 
 def print_waiting_times(env, line):
 
     waiting_time = []
     for station in range(sd.n_stations[line]):
         vehicle = getClosestVehicle(station, line)
-        if vehicle == None or vehicle > sd.segment_length * sd.n_stations[line]:
+        if vehicle is None or vehicle > sd.segment_length * sd.n_stations[line]:
             waiting_time.append(-1)
         elif vehicle == sd.segment_length * station:
             waiting_time.append(0)
@@ -67,7 +80,7 @@ def print_waiting_times(env, line):
 
             if (vehicle >= 0):
                 wt = 0
-                #segment = vehicle // segment_length
+                # segment = vehicle // segment_length
                 curr_segment = station - 1
                 while curr_segment > vehicle // sd.segment_length:
                     speed = sd.speed_d if curr_segment % 2 else sd.speed_p
@@ -141,9 +154,10 @@ def interoplate_gps_position(line, last_passed_station, percentage):
     return [float(station1[2]) + delta_lat * percentage, float(station1[3]) + delta_lon * percentage]
 
 
-def save_file(filename, data, simplified_data):
+def save_wt_file(filename, data, simplified_data):
     with open(filename, "w") as f:
         f.write(json.dumps({"data": data, "simplified_data": simplified_data}))
+
 
 env = simpy.Environment()
 
@@ -158,11 +172,10 @@ for line in sd.lines:
 #for i in range(sd.num_users):
 
 User(env, 0, 0, [sd.milan_lat, sd.milan_lon], [12, 18, "94"])
-User(env, 1, 0, [sd.milan_lat - 0.001, sd.milan_lon - 0.01], [3, 7, "94"])
-User(env, 2, 0, [sd.milan_lat - 0.003, sd.milan_lon], [9, 14, "94"])
+User(env, 1, 0, [sd.milan_lat - 0.001, sd.milan_lon - 0.01], [5, 10, "94"])
+#User(env, 2, 0, [sd.milan_lat - 0.003, sd.milan_lon], [9, 14, "94"])
 
-for line in sd.lines:
-    env.process(save_data_to_file(env, line))
-env.run(until=12000)
+env.process(save_data_to_file(env))
+env.run(until=8000)
 
 #env.process(train(env, 1))

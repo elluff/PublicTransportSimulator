@@ -11,11 +11,11 @@ station_stop = 30
 station_incr = 0
 
 segment_length = 500  # meters
-delta_schedule = 60 * 10  # schedule
+delta_schedule = 60 * 30  # schedule
 
 
-num_vehicles = 15  # number of vehicles on a line
-num_users = 20  # number of users walking or riding a vehicle
+num_vehicles = 2  # number of vehicles on a line
+num_users = 4  # number of users walking or riding a vehicle
 
 
 lines = ["15", "94", "61"]

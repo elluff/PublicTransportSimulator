@@ -4,8 +4,8 @@ from geopy.distance import vincenty
 
 stationDistanceError = 20
 
-GPSnoise = 0.0005
-
+GPSnoise = 0.00025
+#GPSnoise = 0
 
 class User(object):
 
@@ -24,6 +24,7 @@ class User(object):
         self.starting_time = starting_time
         self.starting_pos = starting_pos
         self.line = line
+        self.train_id = None
 
         self.walking = True
         self.arrived = False
@@ -48,22 +49,21 @@ class User(object):
         end_st[2] = float(end_st[2])
         end_st[3] = float(end_st[3])
 
-        print "......."
-        print self.user_id
-        print start_st
-
         while True:
 
-            if closeToStation(sd.users_pos_array[self.user_id][0], sd.users_pos_array[self.user_id][1], start_st[2], start_st[3]) and closeToStation(sd.users_pos_array[self.user_id][0], sd.users_pos_array[self.user_id][1], sd.gps_trains_position[self.line][-1][0][0], sd.gps_trains_position[self.line][-1][0][1]):
-                self.walking = False
+            if self.walking and len(sd.gps_trains_position[self.line]) is not 0:
+                for i in range(len(sd.gps_trains_position[self.line][-1])):
+                    train_on_line = sd.gps_trains_position[self.line][-1][i]
+                    if closeToStation(sd.users_pos_array[self.user_id][0], sd.users_pos_array[self.user_id][1], start_st[2], start_st[3]) and closeToStation(sd.users_pos_array[self.user_id][0], sd.users_pos_array[self.user_id][1], train_on_line[0], train_on_line[1]):
+                        self.walking = False
+                        self.train_id = i
 
             if closeToStation(sd.users_pos_array[self.user_id][0], sd.users_pos_array[self.user_id][1], end_st[2], end_st[3]):
                 self.walking = True
                 self.arrived = True
 
             if not self.walking:
-                # print "onBoard"
-                coordinates = generateUsersGpsPos(sd.gps_trains_position[self.line])
+                coordinates = generateUsersGpsPos(sd.gps_trains_position[self.line], self.train_id)
                 sd.users_pos_array[self.user_id][0] = coordinates[0]
                 sd.users_pos_array[self.user_id][1] = coordinates[1]
             elif self.arrived:
@@ -91,10 +91,10 @@ class User(object):
                 else:
                     sd.users_pos_array[self.user_id][1] += self.walking_speed
 
-                #print "--------------"
-                #print sd.users_pos_array[self.user_id][0]
+                # print "--------------"
+                # print sd.users_pos_array[self.user_id][0]
                 sd.users_pos_array[self.user_id][0] = gauss(float(sd.users_pos_array[self.user_id][0]), GPSnoise / 10)
-                #print sd.users_pos_array[self.user_id][0]
+                # print sd.users_pos_array[self.user_id][0]
                 sd.users_pos_array[self.user_id][1] = gauss(sd.users_pos_array[self.user_id][1], GPSnoise / 10)
 
             yield self.env.timeout(self.delta_t)
@@ -105,9 +105,10 @@ def closeToStation(usr_lat, usr_lon, stat_lat, stat_lon):
     return dist <= stationDistanceError
 
 
-def generateUsersGpsPos(trains):
+def generateUsersGpsPos(trains, train_id):
     if not len(trains):
         return [-1, -1]
-    first_train = trains[-1][0]
-    return [gauss(float(first_train[0]), GPSnoise), gauss(float(first_train[1]), GPSnoise)]
+
+    selected_train = trains[-1][train_id]
+    return [gauss(float(selected_train[0]), GPSnoise), gauss(float(selected_train[1]), GPSnoise)]
 

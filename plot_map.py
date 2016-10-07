@@ -2,15 +2,23 @@ import json
 import gmplot
 from vectors import *
 
+
 print "STARTING PLOT"
 
-extended_data_filename = "61_extended_data.json"
+
+# extended_data_filename = "94_extended_data.json"
+simulated_trains_filename = ["15_simulated_trains_gps.json",
+                             "61_simulated_trains_gps.json",
+                             "94_simulated_trains_gps.json"]
+
+line_colors = ["#ff3333", "#00ff00", "#0066ff", "#ffff00"]
+
+users_filename = "simulated_users_gps.json"
+
+
 snapper_data_filename = "snapper_data.json"
 
 gmap = gmplot.GoogleMapPlotter(45.4638768, 9.1905701, 14)
-
-latitudes = []
-longitudes = []
 
 
 def load_json(filename):
@@ -35,25 +43,35 @@ def pnt2line(pnt, start, end):
     nearest = add(nearest, start)
     return (dist, nearest)
 
+def get_max_snapped(snapped_user_array):
+    weight = -10
+    max_snap = None
+    for snapped_user in snapped_user_array:
+        if snapped_user[3] > weight:
+            weight = snapped_user[3]
+            max_snap = snapped_user
+    return max_snap
 
-a = load_json(extended_data_filename)
 
-train_array = a["data"]
-users_array = a["simplified_data"]
+lines_array = []
+for line_filename in simulated_trains_filename:
+    a = load_json(line_filename)
+    lines_array.append([a["trains"], a["line"]])
 
-# PLOT 
-for d in train_array:
-    #for vehicle in d:
+b = load_json(users_filename)
+users_array = b["users"]
+
+# PLOT LINES
+color = 0
+for train_array in lines_array:
+    latitudes = []
+    longitudes = []
+    for d in train_array[0]:
         latitudes.append(float(d[0][0]))
         longitudes.append(float(d[0][1]))
 
-gmap.plot(latitudes, longitudes, 'cornflowerblue', edge_width=5)
-
-more_lats = []
-more_lngs = []
-
-
-# gmap.scatter(more_lats, more_lngs, '#3B0B39', size=40, marker=False)
+    gmap.plot(latitudes, longitudes, line_colors[color], edge_width=5)
+    color += 1
 
 
 # PLOT USERS' GPS
@@ -65,20 +83,22 @@ for users in users_array:
             marker_lats.append(float(user[0]))
             marker_lngs.append(float(user[1]))
 
+num_trains = 2
+
 gmap.scatter(
-    [marker_lats[m] for m in range(len(marker_lats)) if not m % 3],
-    [marker_lngs[m] for m in range(len(marker_lngs)) if not m % 3],
+    [marker_lats[m] for m in range(len(marker_lats)) if not m % num_trains],
+    [marker_lngs[m] for m in range(len(marker_lngs)) if not m % num_trains],
     'b', size=5, marker=True)
 
 gmap.scatter(
-    [marker_lats[m] for m in range(len(marker_lats)) if not (m + 1) % 3],
-    [marker_lngs[m] for m in range(len(marker_lngs)) if not (m + 1) % 3],
+    [marker_lats[m] for m in range(len(marker_lats)) if not (m + 1) % num_trains],
+    [marker_lngs[m] for m in range(len(marker_lngs)) if not (m + 1) % num_trains],
     'c', size=5, marker=True)
 
-gmap.scatter(
-    [marker_lats[m] for m in range(len(marker_lats)) if not (m + 2) % 3],
-    [marker_lngs[m] for m in range(len(marker_lngs)) if not (m + 2) % 3],
-    'm', size=5, marker=True)
+# gmap.scatter(
+#     [marker_lats[m] for m in range(len(marker_lats)) if not (m + 2) % num_trains],
+#     [marker_lngs[m] for m in range(len(marker_lngs)) if not (m + 2) % num_trains],
+#     'm', size=5, marker=True)
 
 
 # PLOT SNAPPED USERS
@@ -92,9 +112,10 @@ snapper_walking_lats = []
 snapper_walking_lngs = []
 
 for snaps in snapper_array:
-    for snap in snaps:
-        if snap[0] >= 0:
-            if snap[2] == 1:
+    for s in snaps:
+        snap = get_max_snapped(s)
+        if snap is not None and snap[0] >= 0:
+            if snap[2] is not -1:
                 snapper_onboard_lats.append(float(snap[0]))
                 snapper_onboard_lngs.append(float(snap[1]))
             else:
@@ -102,10 +123,12 @@ for snaps in snapper_array:
                 snapper_walking_lngs.append(float(snap[1]))
 
 
-gmap.scatter(snapper_onboard_lats, snapper_onboard_lngs, 'g', size=20, marker=False)
-gmap.scatter(snapper_walking_lats, snapper_walking_lngs, 'r', size=20, marker=False)
-
-
+gmap.scatter(snapper_onboard_lats,
+             snapper_onboard_lngs,
+             'g', size=10, marker=False)
+gmap.scatter(snapper_walking_lats,
+             snapper_walking_lngs,
+             'r', size=10, marker=False)
 
 
 gmap.draw("mymap.html")
